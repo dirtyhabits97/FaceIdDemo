@@ -14,28 +14,48 @@ public enum Result<T> {
     case failure(Error)
 }
 
-public enum BiometrictAuthManagerError: LocalizedError {
+public enum BiometricAuthManagerError: LocalizedError {
     
     case policyEvaluationFailed
+    case noAvailableBiometryType
     
     public var errorDescription: String? {
         switch self {
         case .policyEvaluationFailed: return "Local Authentication Policy failed"
+        case .noAvailableBiometryType: return "No available biometry type"
         }
     }
     
 }
 
-public final class BiometrictAuthManager {
+public final class BiometricAuthManager {
     
-    public static let shared = BiometrictAuthManager()
+    public static let shared = BiometricAuthManager()
+    
     private let context = LAContext()
     
-    public var deviceSupportsBiometrics: Bool { return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) }
+    public var isAvailable: Bool { return availableBiometryType != .none }
+    public var availableBiometryType: BiometryType {
+        let isAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+        guard isAvailable else { return .none }
+        if #available(iOS 11.0, *) {
+            return context.biometryType == .faceID ? .faceID : .touchID
+        }
+        return .touchID
+    }
     
     public func requestAuthentication(completion: @escaping (Result<Void>) -> Void) {
-        guard deviceSupportsBiometrics else { return }
-        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Some reason goes here") { (success, error) in
+        let localizedReason: String
+        switch availableBiometryType {
+        case .touchID:
+            localizedReason = "Touch ID will allow us to authenticate you automatically"
+        case .faceID:
+            localizedReason = "Face ID will allow us to authenticate you automatically"
+        case .none:
+            completion(.failure(BiometricAuthManagerError.noAvailableBiometryType))
+            return
+        }
+        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: localizedReason) { (success, error) in
             if let error = error {
                 completion(.failure(error))
             } else if success {
@@ -43,9 +63,19 @@ public final class BiometrictAuthManager {
                     completion(.success(()))
                 }
             } else {
-                completion(.failure(BiometrictAuthManagerError.policyEvaluationFailed))
+                completion(.failure(BiometricAuthManagerError.policyEvaluationFailed))
             }
         }
+    }
+    
+}
+
+extension BiometricAuthManager {
+    
+    public enum BiometryType {
+        case touchID
+        case faceID
+        case none
     }
     
 }

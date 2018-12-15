@@ -20,8 +20,8 @@ class ViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if ViewController.autoAuthenticate && BiometrictAuthManager.shared.deviceSupportsBiometrics {
-            BiometrictAuthManager.shared.requestAuthentication { (result) in
+        if ViewController.autoAuthenticate {
+            BiometricAuthManager.shared.requestAuthentication { (result) in
                 switch result {
                 case .failure(let error): print("Biometric authentication failed: ", error.localizedDescription)
                 case .success: print("Biometrict authentication passed!!")
@@ -31,14 +31,21 @@ class ViewController: UIViewController {
     }
     
     private func setupView() {
-        button.setTitle("Test biometrics", for: .normal)
         button.addTarget(self, action: #selector(didPressButton), for: .touchUpInside)
-        button.isHidden = !BiometrictAuthManager.shared.deviceSupportsBiometrics
+        switch BiometricAuthManager.shared.availableBiometryType {
+        case .none:
+            button.isHidden = true
+        case .faceID:
+            button.setTitle("Test face id", for: .normal)
+            button.isHidden = false
+        case .touchID:
+            button.setTitle("Test touch id", for: .normal)
+            button.isHidden = false
+        }
     }
     
     @objc func didPressButton() {
-        guard BiometrictAuthManager.shared.deviceSupportsBiometrics else { return }
-        BiometrictAuthManager.shared.requestAuthentication { (result) in
+        BiometricAuthManager.shared.requestAuthentication { (result) in
             switch result {
             case .failure(let error): print("Biometric authentication failed: ", error.localizedDescription)
             case .success: print("Biometrict authentication passed!!")
